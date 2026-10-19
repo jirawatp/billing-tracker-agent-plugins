@@ -1,0 +1,7 @@
+{
+  "$comment": "Single source of truth for values repeated across this repo. Change a value here, run `node scripts/sync.mjs`, and commit the result.",
+  "serverUrl": "https://bills.jirawat.dev/mcp",
+  "appUrl": "https://bills.jirawat.dev",
+  "repository": "jirawatp/billing-tracker-agent-plugins",
+  "version": "0.1.0"
+}

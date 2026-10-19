@@ -1,0 +1,22 @@
+# Dependencies and tool caches
+node_modules/
+.lycheecache
+.mcp-auth/
+
+# Secrets: personal access tokens and header files must never be committed
+.env
+.env.*
+*-headers.txt
+
+# MCP Registry publisher credentials
+.mcpregistry_*
+
+# Packaged skills
+*.zip
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

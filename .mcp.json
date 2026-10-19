@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "bills": {
+      "type": "http",
+      "url": "https://bills.jirawat.dev/mcp"
+    }
+  }
+}

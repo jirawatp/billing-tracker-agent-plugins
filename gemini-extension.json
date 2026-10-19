@@ -1,0 +1,10 @@
+{
+  "name": "billing-tracker",
+  "version": "0.1.0",
+  "description": "Check what is due, record payments, manage bills and read spending reports in Bill Tracker. Sign in with your own Google or LINE account.",
+  "mcpServers": {
+    "bills": {
+      "httpUrl": "https://bills.jirawat.dev/mcp"
+    }
+  }
+}

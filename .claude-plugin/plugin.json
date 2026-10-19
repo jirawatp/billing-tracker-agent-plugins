@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "billing-tracker",
+  "displayName": "Bill Tracker",
+  "version": "0.1.0",
+  "description": "Connect Claude to Bill Tracker to check what is due, record payments, manage bills and read spending reports. Sign in with your own Google or LINE account; you only ever see your own bills.",
+  "author": {
+    "name": "jirawatp",
+    "url": "https://github.com/jirawatp"
+  },
+  "homepage": "https://github.com/jirawatp/billing-tracker-agent-plugins#readme",
+  "repository": "https://github.com/jirawatp/billing-tracker-agent-plugins",
+  "license": "MIT",
+  "keywords": [
+    "bills",
+    "bill-tracker",
+    "personal-finance",
+    "payments",
+    "reminders",
+    "thai-baht",
+    "line",
+    "mcp"
+  ]
+}

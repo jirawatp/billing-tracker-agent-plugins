@@ -1,0 +1,20 @@
+{
+  "name": "billing-tracker",
+  "interface": {
+    "displayName": "Bill Tracker"
+  },
+  "plugins": [
+    {
+      "name": "billing-tracker",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

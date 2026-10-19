@@ -1,0 +1,44 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "billing-tracker",
+  "version": "0.1.0",
+  "description": "Connect your AI agent to Bill Tracker to check what is due, record payments, manage bills and read spending reports. Sign in with your own Google or LINE account; you only ever see your own bills.",
+  "author": {
+    "name": "jirawatp",
+    "url": "https://github.com/jirawatp"
+  },
+  "homepage": "https://github.com/jirawatp/billing-tracker-agent-plugins#readme",
+  "repository": "https://github.com/jirawatp/billing-tracker-agent-plugins",
+  "license": "MIT",
+  "keywords": [
+    "bills",
+    "bill-tracker",
+    "personal-finance",
+    "payments",
+    "reminders",
+    "thai-baht",
+    "line",
+    "mcp"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Bill Tracker",
+        "shortDescription": "Check, pay and manage your bills",
+        "longDescription": "Bill Tracker keeps your bills, due dates and payments in one place. This plugin connects ChatGPT and Codex to your own Bill Tracker account so they can list what is due or overdue, record payments, add or edit bills and summarize your spending. Sign in with the Google or LINE account you use in the app.",
+        "developerName": "jirawatp",
+        "category": "Productivity",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://bills.jirawat.dev",
+        "defaultPrompt": [
+          "What bills are due this week?",
+          "Mark my internet bill as paid.",
+          "How much did I spend on bills last month?"
+        ]
+      }
+    }
+  }
+}

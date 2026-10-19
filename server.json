@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jirawatp/billing-tracker",
+  "title": "Bill Tracker",
+  "description": "Personal bill tracker: due dates, payments and spending reports. Sign in with Google or LINE.",
+  "version": "0.1.0",
+  "websiteUrl": "https://github.com/jirawatp/billing-tracker-agent-plugins#readme",
+  "repository": {
+    "url": "https://github.com/jirawatp/billing-tracker-agent-plugins",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://bills.jirawat.dev/mcp"
+    }
+  ]
+}

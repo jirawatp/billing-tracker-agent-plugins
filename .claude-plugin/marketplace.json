@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "billing-tracker",
+  "description": "Bill Tracker for AI agents: the Bill Tracker MCP server plus a skill for working with your bills.",
+  "owner": {
+    "name": "jirawatp",
+    "url": "https://github.com/jirawatp"
+  },
+  "plugins": [
+    {
+      "name": "billing-tracker",
+      "source": "./",
+      "description": "Check what is due, record payments, manage bills and read spending reports in Bill Tracker.",
+      "category": "productivity",
+      "tags": [
+        "bills",
+        "personal-finance",
+        "payments"
+      ]
+    }
+  ]
+}

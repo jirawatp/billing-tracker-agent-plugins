@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "bills": {
+      "serverUrl": "https://bills.jirawat.dev/mcp"
+    }
+  }
+}
