@@ -1,0 +1,25 @@
+# Settings for the link check in .github/workflows/ci.yml.
+
+# Links inside code blocks and inline code are not checked: they include the
+# MCP endpoint and example URLs that only answer MCP clients.
+include_verbatim = false
+
+# Check #anchors in links between Markdown files.
+include_fragments = "anchor-only"
+
+scheme = ["https", "http", "file"]
+accept = ["200..=299", "429"]
+max_retries = 3
+retry_wait_time = 5
+timeout = 30
+no_progress = true
+
+exclude = [
+  # MCP endpoints accept only POST requests from MCP clients.
+  '/mcp$',
+  # One-click install links redirect to vscode: URLs, which lychee cannot follow.
+  '^https://(insiders\.)?vscode\.dev/redirect',
+  # Hosts used in examples.
+  '^https?://(localhost|127\.0\.0\.1)',
+  '^https://(mcp\.)?example\.com',
+]

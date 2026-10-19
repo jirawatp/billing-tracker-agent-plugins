@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, to catch links that stop working.
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate manifests, skill and docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Every file matches config.json
+        run: node scripts/sync.mjs --check
+
+      - name: Offline checks (JSON, TOML, docs, skill, tool names, style)
+        run: node scripts/validate.mjs --ci
+
+      - name: Install validators
+        run: python -m pip install --disable-pip-version-check check-jsonschema skills-ref
+
+      - name: JSON Schemas
+        run: |
+          check-jsonschema --schemafile https://agent-plugins.org/schemas/1.0.0/plugin.schema.json plugin.json
+          check-jsonschema --schemafile https://agent-plugins.org/schemas/1.0.0/mcp.schema.json mcp.json
+          check-jsonschema --schemafile "$(jq -r '."$schema"' server.json)" server.json
+          check-jsonschema --schemafile https://json.schemastore.org/claude-code-plugin-manifest.json .claude-plugin/plugin.json
+          check-jsonschema --schemafile https://json.schemastore.org/claude-code-marketplace.json .claude-plugin/marketplace.json
+          check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml
+
+      - name: Claude Code plugin and marketplace
+        run: |
+          npx --yes @anthropic-ai/claude-code@latest plugin validate . --strict
+          npx --yes @anthropic-ai/claude-code@latest plugin validate .claude-plugin/plugin.json --strict
+
+      - name: Gemini CLI extension
+        run: npx --yes @google/gemini-cli@latest extensions validate .
+
+      - name: Agent Skills reference validator
+        run: agentskills validate skills/billing-tracker
+
+  links:
+    name: Check links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: --config lychee.toml README.md 'skills/**/*.md'
+          fail: true

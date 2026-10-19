@@ -1,0 +1,54 @@
+name: Publish to MCP Registry
+
+# Run by hand from the Actions tab once the server is live. The registry
+# rejects a version it already has, so bump the version in config.json first.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish server.json
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Lets mcp-publisher prove ownership of the io.github.<owner> namespace.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Every file matches config.json
+        run: node scripts/sync.mjs --check
+
+      - name: Offline checks
+        run: node scripts/validate.mjs --ci
+
+      - name: Server answers with an OAuth challenge
+        run: |
+          url="$(node -p "require('./config.json').serverUrl")"
+          headers="$(curl -s -o /dev/null -D - -X POST "$url" \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')"
+          echo "$headers" | head -n 1
+          if ! echo "$headers" | grep -qiE '^www-authenticate: *bearer .*resource_metadata='; then
+            echo "::error::$url did not answer with an OAuth challenge. Publish only after the server is live."
+            exit 1
+          fi
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Sign in with GitHub OIDC
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish
+        run: ./mcp-publisher publish
