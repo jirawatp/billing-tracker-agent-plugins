@@ -109,7 +109,7 @@ Every configuration names the server `bills`.
 | --- | --- | --- |
 | [Claude Code](#claude-code) | Plugin from this marketplace | Yes |
 | [Claude apps](#claude-apps-claudeai-claude-desktop-mobile) (claude.ai, Claude Desktop, mobile) | Custom connector | Upload it separately |
-| [ChatGPT](#chatgpt) | Custom MCP server, created as a plugin | No |
+| [ChatGPT](#chatgpt) (Business, Enterprise and Edu, on the web) | Custom MCP server, created as a plugin | No |
 | [Codex](#codex-cli-ide-extension-and-chatgpt-desktop-app) (CLI, IDE extension, ChatGPT desktop app) | Plugin from this marketplace | Yes |
 | [Cursor](#cursor) | One-click install link, or local plugin | With the plugin |
 | [VS Code and GitHub Copilot](#vs-code-and-github-copilot) | One-click install link, or plugin from source | With the plugin |
@@ -193,6 +193,12 @@ zip -r billing-tracker.zip billing-tracker
 
 ### ChatGPT
 
+Custom MCP servers with full tool support are available on ChatGPT Business,
+Enterprise and Edu, on the web only. On Business, only workspace admins and
+owners can add one; on Enterprise and Edu, admins and the members they
+authorize can. Pro accounts can connect custom MCP servers with read and fetch
+access only, so Bill Tracker's tools that change data are not available there.
+
 1. Open **Plugins** in ChatGPT, select the **+** button, then
    **Add custom MCP server**.
 2. Enter the name `Bill Tracker` and, under **Connection**, the URL
@@ -205,9 +211,9 @@ zip -r billing-tracker.zip billing-tracker
    LINE when asked.
 6. In a new chat, type `@` and choose Bill Tracker.
 
-Account and workspace policies apply: on Business and Enterprise workspaces an
-admin may need to allow custom MCP servers. ChatGPT asks you to confirm write
-actions according to the plugin's permissions.
+To share it with the workspace, an admin or owner publishes the plugin.
+ChatGPT asks you to confirm write actions according to the plugin's
+permissions.
 
 ### Codex (CLI, IDE extension and ChatGPT desktop app)
 
@@ -450,7 +456,7 @@ configure the server in those agents directly.
 ### Other clients (stdio only)
 
 For clients that can only start local MCP servers, run
-[mcp-remote](https://github.com/geelen/mcp-remote) as a bridge. It needs
+[mcp-remote](https://github.com/punkpeye/mcp-remote) as a bridge. It needs
 Node.js, opens the browser for sign-in and keeps tokens in `~/.mcp-auth`.
 
 ```json
@@ -645,8 +651,9 @@ pass it with `--header-file`:
 ## What your agent can do
 
 The server offers 30 tools, 3 resources and 1 prompt. Each tool needs one of
-the permissions listed above. Destructive tools only run with an explicit
-confirmation in the request.
+the permissions listed above. Deleting bills, unlinking LINE and deleting your
+account only run with an explicit confirmation in the request, and the skill
+also asks you before it signs you out everywhere.
 
 ### Bills
 
@@ -667,7 +674,7 @@ confirmation in the request.
 | `bills.schedule` | Mark a bill scheduled for payment on a date | `bills:write` |
 | `bills.toggleTopPriority` | Pin or unpin a bill as top priority | `bills:write` |
 | `bills.delete` | Delete a bill (destructive) | `bills:delete` |
-| `bills.bulkDelete` | Delete up to 500 bills, with a dry run first (destructive) | `bills:delete` |
+| `bills.bulkDelete` | Delete up to 500 bills; can preview with a dry run (destructive) | `bills:delete` |
 
 ### Summaries and reports
 
@@ -740,8 +747,9 @@ the server in the current protocol revision on behalf of an older client.
 
 **Tools are missing or out of date.** The server does not push tool-list
 changes, so restart the client or refresh the server: **MCP: Reset Cached
-Tools** in VS Code, **Refresh** on the plugin in ChatGPT, or the refresh button
-in Windsurf.
+Tools** in VS Code or the refresh button in Windsurf. ChatGPT keeps a snapshot
+of the tools from when the plugin was created; a workspace admin refreshes it
+from the plugin's settings.
 
 **Every tool appears twice.** You installed the plugin and also added the
 server by hand. Remove one of them.
@@ -872,10 +880,12 @@ pick up changes when the version changes.
 ### Keep the skill in step with the server
 
 The tool names, resources and prompt in `skills/billing-tracker` follow the
-server's integration contract. If the server adds, renames or removes a tool,
-update `references/tools.md`, `SKILL.md`, the tool tables in this README and
-`TOOL_COUNT` in `scripts/validate.mjs`. The validator checks that every tool
-named in the docs appears in the reference table.
+server's integration contract, which is also listed in `scripts/validate.mjs`.
+If the server adds, renames or removes a tool, update that list,
+`references/tools.md`, `SKILL.md` and the tool tables in this README. The
+validator checks that the reference table and this README cover every contract
+tool, and that no document names a tool, resource or prompt outside the
+contract.
 
 ## License
 

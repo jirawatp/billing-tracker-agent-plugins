@@ -16,13 +16,50 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CI = process.argv.includes('--ci');
 const PLUGIN_NAME = 'billing-tracker';
 const SERVER_KEY = 'bills';
-const TOOL_COUNT = 30;
 const MAX_TOOL_NAME = 64;
 const AGENT_PLUGINS_SCHEMA = 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json';
 const AGENT_PLUGINS_MCP_SCHEMA = 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json';
 const TOOLS_REFERENCE = 'skills/billing-tracker/references/tools.md';
-const TOOL_TOKEN = /`((?:bills|summary|reports|account|lineLink|chat)\.[A-Za-z]+)`/g;
 const TEXT_FILES = /\.(md|json|toml|ya?ml|mjs)$|^(LICENSE|\.gitignore|\.editorconfig)$/;
+
+// The server's integration contract. Changing any of these is a breaking change
+// on the server side, so update them only together with the server.
+const CONTRACT_TOOLS = [
+  'bills.list',
+  'bills.get',
+  'bills.query',
+  'bills.search',
+  'bills.recentlyChanged',
+  'bills.byRef',
+  'bills.create',
+  'bills.update',
+  'bills.markPaid',
+  'bills.recordPayment',
+  'bills.setAmount',
+  'bills.confirm',
+  'bills.schedule',
+  'bills.toggleTopPriority',
+  'bills.delete',
+  'bills.bulkDelete',
+  'summary.kpis',
+  'summary.month',
+  'summary.chatbot',
+  'reports.spend',
+  'reports.spendDigest',
+  'reports.paidMonthlyAverage',
+  'account.export',
+  'account.delete',
+  'account.revokeSessions',
+  'lineLink.status',
+  'lineLink.setNotifyEnabled',
+  'lineLink.unlink',
+  'chat.parseCommand',
+  'chat.run',
+];
+const CONTRACT_RESOURCES = ['bill://<id>', 'summary://today', 'report://spend/<yyyy-mm>'];
+const CONTRACT_PROMPTS = ['summarize-month'];
+const TOOL_LIKE = /`((?:bills?|summar(?:y|ies)|reports?|accounts?|lineLink|line|chats?)\.[A-Za-z]+)`/g;
+const RESOURCE_LIKE = /`((?:bills?|summar(?:y|ies)|reports?):\/\/[^`]*)`/g;
 
 const errors = [];
 const warnings = [];
@@ -221,30 +258,47 @@ function checkSkills() {
 }
 
 function checkTools() {
+  const tools = new Set(CONTRACT_TOOLS);
+  const resources = new Set(CONTRACT_RESOURCES);
+  for (const tool of tools) {
+    const qualified = `mcp__plugin_${PLUGIN_NAME}_${SERVER_KEY}__${tool}`;
+    if (qualified.length > MAX_TOOL_NAME) {
+      report('scripts/validate.mjs', `${qualified} is longer than ${MAX_TOOL_NAME} characters`);
+    }
+  }
+
   if (!files.includes(TOOLS_REFERENCE)) {
     report(TOOLS_REFERENCE, 'missing');
     return;
   }
-  const catalogue = new Set();
+  const listed = [];
   for (const line of read(TOOLS_REFERENCE).split('\n')) {
     const cell = line.match(/^\|\s*`([^`]+)`\s*\|/);
-    if (cell && /^(bills|summary|reports|account|lineLink|chat)\.[A-Za-z]+$/.test(cell[1])) {
-      if (catalogue.has(cell[1])) report(TOOLS_REFERENCE, `lists ${cell[1]} twice`);
-      catalogue.add(cell[1]);
-    }
+    if (cell && !cell[1].includes('://')) listed.push(cell[1]);
   }
-  if (catalogue.size !== TOOL_COUNT) {
-    report(TOOLS_REFERENCE, `lists ${catalogue.size} tools; the server contract has ${TOOL_COUNT}`);
+  for (const name of listed) {
+    if (listed.indexOf(name) !== listed.lastIndexOf(name)) report(TOOLS_REFERENCE, `lists ${name} twice`);
+    if (!tools.has(name) && !CONTRACT_PROMPTS.includes(name)) report(TOOLS_REFERENCE, `lists ${name}, which is not in the contract`);
   }
-  for (const tool of catalogue) {
-    const qualified = `mcp__plugin_${PLUGIN_NAME}_${SERVER_KEY}__${tool}`;
-    if (qualified.length > MAX_TOOL_NAME) {
-      report(TOOLS_REFERENCE, `${qualified} is longer than ${MAX_TOOL_NAME} characters`);
-    }
-  }
+  for (const tool of tools) if (!listed.includes(tool)) report(TOOLS_REFERENCE, `does not list ${tool}`);
+
+  const mustMentionAll = [TOOLS_REFERENCE, 'README.md'];
+  const mustMentionExtras = [TOOLS_REFERENCE, 'README.md', 'skills/billing-tracker/SKILL.md'];
   for (const file of files.filter((f) => f.endsWith('.md'))) {
-    for (const match of read(file).matchAll(TOOL_TOKEN)) {
-      if (!catalogue.has(match[1])) report(file, `mentions unknown tool ${match[1]}`);
+    const text = read(file);
+    for (const match of text.matchAll(TOOL_LIKE)) {
+      if (!tools.has(match[1])) report(file, `mentions ${match[1]}, which is not a contract tool`);
+    }
+    for (const match of text.matchAll(RESOURCE_LIKE)) {
+      if (!resources.has(match[1])) report(file, `mentions ${match[1]}, which is not a contract resource`);
+    }
+    if (mustMentionAll.includes(file)) {
+      for (const tool of tools) if (!text.includes(`\`${tool}\``)) report(file, `does not mention ${tool}`);
+    }
+    if (mustMentionExtras.includes(file)) {
+      for (const name of [...resources, ...CONTRACT_PROMPTS]) {
+        if (!text.includes(`\`${name}\``)) report(file, `does not mention ${name}`);
+      }
     }
   }
 }

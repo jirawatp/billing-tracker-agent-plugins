@@ -128,6 +128,8 @@ function validateConfig(config) {
     if (url.protocol !== 'https:') problems.push(`${key} must use https: ${config[key]}`);
     if (url.search || url.hash || url.username) problems.push(`${key} must not have a query, fragment or credentials`);
     if (config[key].endsWith('/')) problems.push(`${key} must not end with a slash: ${config[key]}`);
+    const canonical = url.pathname === '/' ? url.origin : url.href;
+    if (config[key] !== canonical) problems.push(`${key} must be written in canonical form: ${canonical}`);
   }
   if (!/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/.test(config.repository ?? '')) {
     problems.push(`repository must look like owner/name: ${config.repository}`);
@@ -261,13 +263,9 @@ function installLinkProblems(file, text, values) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  let config = readJson('config.json');
-  if (Object.keys(args.set).length) {
-    if (args.check) fail(['--check cannot be combined with value flags']);
-    config = { ...config, ...args.set };
-    validateConfig(config);
-    writeFileSync(join(ROOT, 'config.json'), toJson(config));
-  }
+  const setsValues = Object.keys(args.set).length > 0;
+  if (setsValues && (args.check || args.print)) fail(['--check and --print cannot be combined with value flags']);
+  const config = { ...readJson('config.json'), ...args.set };
   validateConfig(config);
   const next = derive(config);
   if (args.print) {
@@ -276,9 +274,11 @@ function main() {
   }
 
   const previous = derive(readCanonical());
-  const pairs = TEXT_KEYS.filter((key) => previous[key] !== next[key])
-    .map((key) => [previous[key], next[key]])
-    .sort((a, b) => b[0].length - a[0].length);
+  // Unchanged values map to themselves so that a longer value containing a
+  // shorter one (the server URL contains the app URL) is always matched whole.
+  const pairs = TEXT_KEYS.some((key) => previous[key] !== next[key])
+    ? TEXT_KEYS.map((key) => [previous[key], next[key]]).sort((a, b) => b[0].length - a[0].length)
+    : [];
 
   const updated = new Map();
   for (const file of listFiles()) {
@@ -320,9 +320,12 @@ function main() {
     return;
   }
 
+  if (problems.length) {
+    fail(['sync: nothing was written. Fix these by hand first:', ...problems.map((p) => `  - ${p}`)]);
+  }
   for (const [file, text] of updated) writeFileSync(join(ROOT, file), text);
+  if (setsValues) writeFileSync(join(ROOT, 'config.json'), toJson(config));
   console.log(updated.size ? `sync: updated ${[...updated.keys()].join(', ')}` : 'sync: nothing to change');
-  if (problems.length) fail(['sync: fix these by hand:', ...problems.map((p) => `  - ${p}`)]);
 }
 
 main();

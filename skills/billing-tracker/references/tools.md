@@ -38,7 +38,7 @@ the tool needs.
 | Tool | What it does | Kind | Permission | Main inputs |
 | --- | --- | --- | --- | --- |
 | `bills.delete` | Delete one bill | destructive | `bills:delete` | `id`, `confirm: true` |
-| `bills.bulkDelete` | Delete up to 500 bills; supports a dry run | destructive | `bills:delete` | `ids`, `confirm: true`, optional `dryRun` |
+| `bills.bulkDelete` | Delete up to 500 bills; preview first with a dry run | destructive | `bills:delete` | `ids`, `confirm: true` (also required with `dryRun`), optional `dryRun` |
 
 ## Summaries and reports
 
