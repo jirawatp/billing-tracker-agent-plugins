@@ -58,12 +58,12 @@ Every configuration names the server `bills`.
   Streamable HTTP transport with OAuth sign-in. Every client below supports
   that; clients that can only start local (stdio) servers can use the
   [mcp-remote bridge](#other-clients-stdio-only).
-- **A current client.** The server implements MCP protocol revision
-  `2026-07-28` and also accepts `2025-11-25` and `2025-06-18`, either through
-  per-request protocol headers or the classic `initialize` handshake. It uses
-  Streamable HTTP only; the legacy HTTP+SSE transport is not supported. Clients
-  limited to `2025-03-26` or older can connect through
-  [mcp-remote](#other-clients-stdio-only) with `--protocol auto`.
+- **A current client.** The server speaks MCP protocol revisions `2025-11-25`
+  (preferred) and `2025-06-18` through the standard `initialize` handshake that
+  current clients use. Revision `2026-07-28` is not supported yet: a client
+  that offers it first gets error `-32022` and falls back to `2025-11-25` on its
+  own. The server uses Streamable HTTP only, without the legacy HTTP+SSE
+  transport, and clients limited to `2025-03-26` or older cannot connect.
 
 ## Sign-in, permissions and privacy
 
@@ -78,12 +78,12 @@ Every configuration names the server `bills`.
   signed in. An agent connected to your account cannot reach anyone else's
   bills.
 - **Permissions are granted step by step.** By default the first sign-in asks
-  for `bills:read` and `bills:write`; some clients, such as Codex, ask for
-  every advertised permission up front. Clients that want to stay signed in
-  also ask for `offline_access`, which lets them renew the session without
-  another browser sign-in. When the agent first uses a tool that needs more,
-  the server asks for that permission and your client either reopens the
-  consent screen or asks you to sign in to the server again.
+  for `bills:read`, `bills:write` and `offline_access`, which lets your client
+  renew the session without another browser sign-in. Some clients, such as
+  Codex, ask for every advertised permission up front. When the agent first
+  uses a tool that needs more, the server asks for that permission and your
+  client either reopens the consent screen or asks you to sign in to the server
+  again.
 - **Deleting your account always takes a separate approval.** No client can
   request the `account:delete` permission during sign-in. If you ask an agent
   to delete your account, its first attempt is refused; you then open
@@ -471,9 +471,9 @@ configure the server in those agents directly.
 
 For clients that can only start local MCP servers, run
 [mcp-remote](https://github.com/punkpeye/mcp-remote) as a bridge. It needs
-Node.js, opens the browser for sign-in and keeps tokens in `~/.mcp-auth`. With
-`--protocol auto` it speaks the server's current protocol revision on behalf
-of your client, so it also works for clients limited to older MCP versions.
+Node.js, opens the browser for sign-in and keeps tokens in `~/.mcp-auth`. It
+passes your client's protocol handshake through unchanged, so the client
+itself still needs to speak MCP `2025-06-18` or newer.
 
 ```json
 {
@@ -485,9 +485,7 @@ of your client, so it also works for clients limited to older MCP versions.
         "mcp-remote@latest",
         "https://bills.jirawat.dev/mcp",
         "--transport",
-        "http-only",
-        "--protocol",
-        "auto"
+        "http-only"
       ]
     }
   }
@@ -658,8 +656,6 @@ pass it with `--header-file`:
         "https://bills.jirawat.dev/mcp",
         "--transport",
         "http-only",
-        "--protocol",
-        "auto",
         "--header-file",
         "/path/to/bill-tracker-headers.txt"
       ]
@@ -681,7 +677,7 @@ signs you out everywhere.
 
 | Tool | What it does | Permission |
 | --- | --- | --- |
-| `bills.list` | List your bills in a bucket: all, open, overdue, due soon, unconfirmed, top priority, paid or this month | `bills:read` |
+| `bills.list` | List your bills in a bucket: all, open, overdue, due soon, unconfirmed, top priority, paid or this month. Returns up to 500 at a time and says when there are more | `bills:read` |
 | `bills.get` | Fetch one bill by id or short reference | `bills:read` |
 | `bills.query` | Filter bills by status, due dates, category, payment method and flags | `bills:read` |
 | `bills.search` | Search bill names and notes | `bills:read` |
@@ -731,14 +727,54 @@ signs you out everywhere.
 | `report://spend/<yyyy-mm>` | The spending report for the period ending with that month |
 | `summarize-month` prompt | Summarizes one month's spending; takes `month` as `YYYY-MM` |
 
+### When a tool fails
+
+A failed tool call comes back as a tool result marked `isError: true`, with a
+stable code in `structuredContent.error`, so the agent can read what went wrong
+and correct itself. For example:
+
+```json
+{
+  "isError": true,
+  "content": [
+    {
+      "type": "text",
+      "text": "No bill with that id."
+    }
+  ],
+  "structuredContent": {
+    "error": {
+      "code": 1001,
+      "kind": "not-found",
+      "message": "No bill with that id."
+    }
+  }
+}
+```
+
+| Code | Kind | Meaning |
+| --- | --- | --- |
+| `-32602` | `invalid-params` | The arguments do not match the tool's input schema |
+| `1001` | `not-found` | No such bill, or it belongs to another account |
+| `1002` | `invalid-bill` | A bill value was rejected, for example a scheduled bill without a schedule date |
+| `1003` | `forbidden` | The data belongs to another account |
+| `1004` | `confirm-required` | A destructive call was sent without its confirmation |
+| `1005` | `rate-limited` | Too many requests in a short time |
+| `1006` | `upstream-firestore` | Bill Tracker's database had a temporary problem |
+| `1007` | `insufficient-scope` | A permission you have not granted is needed |
+
+Protocol-level failures are JSON-RPC errors instead: `-32602` for a tool name
+the server does not have, `-32603` for an internal error (its message carries
+a short reference), and `-32022` for an unsupported protocol version.
+
 ## Tool changes and deprecations
 
 The server treats its tools as a versioned public contract, because some hosts,
 ChatGPT among them, keep calling the tool list they saw when you added the
 plugin until an admin refreshes it.
 
-- New tools, new optional inputs and new optional output fields can appear at
-  any time. Existing setups keep working.
+- New tools, new optional inputs, new optional output fields and new error
+  codes can appear at any time. Existing setups keep working.
 - A tool is never renamed, removed or made stricter in place. The server adds
   the new tool next to the old one, marks the old one with a deprecation
   notice, and removes it only after the deprecation has been announced here for
@@ -763,7 +799,8 @@ token, check that the header is exactly `Authorization: Bearer <token>` with no
 quotes or trailing spaces, that the token has not expired, and that the
 environment variable is set where the client starts.
 
-**A tool fails with `insufficient_scope` or "needs additional permissions".**
+**A tool fails with `insufficient_scope`, error `1007` or "needs additional
+permissions".**
 The agent needs a permission you have not granted yet. Approve it when your
 client asks, or sign in to the server again; in Claude Code, open `/mcp` and
 authenticate the server again. For a personal access token, create a new token
@@ -784,10 +821,16 @@ with Codex, include `offline_access` in `--scopes`.
 **Opening the server URL in a browser shows 405 Method Not Allowed.** That is
 expected. The endpoint accepts only MCP requests sent with POST.
 
-**The client reports an unsupported protocol version or cannot initialize.**
-The server supports MCP `2026-07-28`, `2025-11-25` and `2025-06-18`. Update
-your client. Clients limited to `2025-03-26` or older can connect through
-[mcp-remote](#other-clients-stdio-only) with `--protocol auto`.
+**The client reports an unsupported protocol version (`-32022`) or cannot
+initialize.** The server supports MCP `2025-11-25` and `2025-06-18`. A client
+that tries `2026-07-28` first should fall back to `2025-11-25` by itself; if
+yours stops instead, update it. Clients limited to `2025-03-26` or older cannot
+connect yet, and mcp-remote does not change that because it passes the
+client's own handshake through.
+
+**The agent reports error `-32603` with a short reference.** That is an
+internal server error, not a problem with your setup. Try again later; if it
+keeps happening, open an issue in this repository and include the reference.
 
 **Tools are missing or out of date.** The server does not push tool-list
 changes, so restart the client or refresh the server: **MCP: Reset Cached
@@ -827,16 +870,17 @@ curl -i -X POST https://bills.jirawat.dev/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-With a personal access token it should list the tools:
+With a personal access token it should list the tools. The server is
+stateless, so a single request carrying the protocol version header should be
+enough:
 
 ```bash
 curl -sS https://bills.jirawat.dev/mcp \
   -H "Authorization: Bearer $BILL_TRACKER_TOKEN" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -H 'MCP-Protocol-Version: 2026-07-28' \
-  -H 'Mcp-Method: tools/list' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}'
+  -H 'MCP-Protocol-Version: 2025-11-25' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
 For an interactive check, run `npx @modelcontextprotocol/inspector`, choose

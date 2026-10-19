@@ -58,6 +58,16 @@ const CONTRACT_TOOLS = [
 ];
 const CONTRACT_RESOURCES = ['bill://<id>', 'summary://today', 'report://spend/<yyyy-mm>'];
 const CONTRACT_PROMPTS = ['summarize-month'];
+const CONTRACT_ERRORS = {
+  'invalid-params': -32602,
+  'not-found': 1001,
+  'invalid-bill': 1002,
+  forbidden: 1003,
+  'confirm-required': 1004,
+  'rate-limited': 1005,
+  'upstream-firestore': 1006,
+  'insufficient-scope': 1007,
+};
 const TOOL_LIKE = /`((?:bills?|summar(?:y|ies)|reports?|accounts?|lineLink|line|chats?)\.[A-Za-z]+)`/g;
 const RESOURCE_LIKE = /`((?:bills?|summar(?:y|ies)|reports?):\/\/[^`]*)`/g;
 
@@ -274,7 +284,7 @@ function checkTools() {
   const listed = [];
   for (const line of read(TOOLS_REFERENCE).split('\n')) {
     const cell = line.match(/^\|\s*`([^`]+)`\s*\|/);
-    if (cell && !cell[1].includes('://')) listed.push(cell[1]);
+    if (cell && (/^[A-Za-z]+\.[A-Za-z]+$/.test(cell[1]) || CONTRACT_PROMPTS.includes(cell[1]))) listed.push(cell[1]);
   }
   for (const name of listed) {
     if (listed.indexOf(name) !== listed.lastIndexOf(name)) report(TOOLS_REFERENCE, `lists ${name} twice`);
@@ -298,6 +308,11 @@ function checkTools() {
     if (mustMentionExtras.includes(file)) {
       for (const name of [...resources, ...CONTRACT_PROMPTS]) {
         if (!text.includes(`\`${name}\``)) report(file, `does not mention ${name}`);
+      }
+      const rows = text.split('\n').filter((line) => line.startsWith('|'));
+      for (const [kind, code] of Object.entries(CONTRACT_ERRORS)) {
+        const paired = rows.some((row) => row.includes(`\`${kind}\``) && row.includes(`\`${code}\``));
+        if (!paired) report(file, `has no table row pairing error kind ${kind} with code ${code}`);
       }
     }
   }

@@ -18,7 +18,7 @@ the tool needs.
 
 | Tool | What it does | Kind | Permission | Main inputs |
 | --- | --- | --- | --- | --- |
-| `bills.list` | List the user's bills in a bucket | read | `bills:read` | `bucket`: `all`, `open`, `overdue`, `due_soon`, `unconfirmed`, `top_priority`, `paid` or `this_month`; optional `today` |
+| `bills.list` | List the user's bills in a bucket. Returns `today`, at most 500 `bills`, `count` (the full bucket size) and `truncated` (true when there were more than 500) | read | `bills:read` | `bucket`: `all`, `open`, `overdue`, `due_soon`, `unconfirmed`, `top_priority`, `paid` or `this_month`; optional `today` |
 | `bills.get` | Fetch one bill by id or short reference | read | `bills:read` | `id` or `ref` |
 | `bills.query` | Filter by status, due date range, category, payment method and flags, with paging | read | `bills:read` | `status`, `dueFrom`, `dueTo`, `category`, `paymentMethod`, `recurring`, `isConfirmed`, `topPriority`, `limit` (up to 500), `cursor` |
 | `bills.search` | Case-insensitive text match on bill name and note | read | `bills:read` | `query`, `limit` (up to 100) |
@@ -84,6 +84,28 @@ short-lived and is not renewed by a refresh token.
 | --- | --- | --- | --- | --- |
 | `chat.parseCommand` | Parse one line of the Thai or English chatbot syntax without running it | read | `chat:read` | `text` |
 | `chat.run` | Run one chatbot command; commands that add, pay, change an amount or delete need `confirm: true` | change, or destructive for delete | `chat:write` for commands that change data | `text`, optional `confirm` |
+
+## Errors
+
+A failed tool call returns a result with `isError: true` and
+`structuredContent.error` set to `{ code, kind, message }`, plus `data` when
+there are details. SKILL.md explains how to act on each kind.
+
+| Code | Kind | Meaning |
+| --- | --- | --- |
+| `-32602` | `invalid-params` | Arguments do not match the input schema |
+| `1001` | `not-found` | No such bill, or it belongs to another account |
+| `1002` | `invalid-bill` | A bill value was rejected |
+| `1003` | `forbidden` | The data belongs to another account |
+| `1004` | `confirm-required` | A destructive call was sent without `confirm` |
+| `1005` | `rate-limited` | Too many requests in a short time |
+| `1006` | `upstream-firestore` | Temporary database problem |
+| `1007` | `insufficient-scope` | A permission the user has not granted is needed |
+
+JSON-RPC errors are reserved for protocol faults: `-32602` for an unknown
+tool name, `-32603` for an internal error (with a short reference in the
+message) and `-32022` for an unsupported protocol version. New error codes
+may be added over time.
 
 ## Resources
 

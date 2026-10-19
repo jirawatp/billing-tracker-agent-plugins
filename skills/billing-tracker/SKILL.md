@@ -23,13 +23,16 @@ Thai Baht (THB) and dates follow the Asia/Bangkok calendar.
 - If a call fails because the user is not signed in or the session expired,
   ask them to sign in again to the `bills` server from their client's MCP
   settings.
-- If a call fails for a missing permission (`insufficient_scope`), name the
+- If a call fails for a missing permission (an `insufficient_scope` sign-in
+  challenge, or a tool error of kind `insufficient-scope`), name the
   permission the server asked for, such as `reports:read`, and ask the user
   to approve it. Many clients reopen the Bill Tracker consent screen; others
   need the user to sign in to the server again. A personal access token
   needs to be replaced by one that includes that permission, created at
   https://bills.jirawat.dev/settings/connected-agents. The `account:delete`
   permission works differently; see `account.delete` below.
+- Other tool failures come back as results you can read and act on; see
+  "When a call fails".
 - The server can add tools over time; follow each tool's own description and
   input schema. If a tool carries a deprecation notice, use the replacement
   it names.
@@ -109,7 +112,7 @@ user asked directly, and list exactly what will be affected.
   `account.export` first, and ask them to confirm in their own words. Then
   pass the confirmation value that the tool's input schema requires. The
   `account:delete` permission is never part of a normal sign-in, so unless the
-  user has just approved it, the call fails with `insufficient_scope`. Tell
+  user has just approved it, the call fails for a missing permission. Tell
   the user to open https://bills.jirawat.dev/settings/connected-agents and
   approve account deletion on its dedicated consent screen, then call again
   once they say it is done; the approval is short-lived. Never try to obtain
@@ -132,6 +135,10 @@ even when they typed the command themselves.
 - Search by name or note with `bills.search`, or list a bucket with
   `bills.list`. Use `bills.query` for filters such as status, due date range,
   category or payment method; it pages results with `nextCursor`.
+- `bills.list` returns at most 500 bills. When `truncated` is true, `count`
+  is the full size of the bucket: say how many bills there are, and use a
+  narrower bucket or `bills.query` (following `nextCursor`) to reach the rest.
+  Never present a truncated list as complete.
 - A short reference from the LINE chatbot resolves with `bills.byRef`, or
   pass it to `bills.get` as `ref`.
 - If several bills match, show the candidates (name, due date, amount,
@@ -143,7 +150,7 @@ even when they typed the command themselves.
 
 | The user asks | Do this |
 | --- | --- |
-| What is due or overdue? | `bills.list` with `bucket` set to `overdue`, `due_soon`, `open` or `this_month`; `summary.kpis` for counts and totals |
+| What is due or overdue? | `bills.list` with `bucket` set to `overdue`, `due_soon`, `open` or `this_month` (check `truncated`); `summary.kpis` for counts and totals |
 | Mark a bill as paid | Find it, then `bills.markPaid`; pass `paidDate` if they paid on another day |
 | I paid part of it | `bills.recordPayment` with the amount, plus `paidDate` if not today; report `remaining` |
 | Add a bill | Collect the name and amount, plus the due date, whether it repeats (`cycle` monthly or yearly), category and payment method if known; then `bills.create` |
@@ -186,14 +193,40 @@ even when they typed the command themselves.
 
 ## When a call fails
 
-| Failure | What to do |
-| --- | --- |
-| Not found | The bill does not exist or belongs to someone else. Search again; do not retry the same id. |
-| Invalid bill | The server rejected a value. Tell the user which field and why, and ask for a corrected value. |
-| Confirmation required | You called a destructive tool without `confirm`. Ask the user before calling again. |
-| Rate limited | Wait a minute, then try again. Avoid loops of repeated calls. |
-| Insufficient scope | The user has not granted that permission. Name it and ask them to approve it; for `account:delete`, on the Connected AI agents page. |
-| Not signed in | Ask the user to sign in to the `bills` server again. |
+A tool that fails still returns a result, marked `isError: true`. Its
+`structuredContent.error` object tells you what went wrong: a numeric `code`,
+a `kind`, a `message` and sometimes `data` with details. Read that object
+instead of guessing from the text, fix the cause, and retry at most once.
+
+1. Check `kind` (or `code`) against the table below.
+2. Use `message` and `data` to find the exact field or value at fault.
+3. Correct the call yourself only when the fix does not change what the user
+   asked for, such as a misspelled argument, a value in the wrong format or a
+   bucket name that does not exist. If the fix needs a decision or a value
+   only the user has, ask them.
+4. Never retry a call that changes or deletes data without the user's go-ahead,
+   and never add `confirm` on your own.
+
+| `kind` (`code`) | What it means | What to do |
+| --- | --- | --- |
+| `invalid-params` (`-32602`) | The arguments do not match the tool's input schema, for example a missing `id` or an unknown `bucket` | Re-read the input schema, fix the arguments and retry once |
+| `not-found` (`1001`) | No such bill, or it belongs to another account | Do not retry the same id. Search again with `bills.search` or `bills.list` and check with the user |
+| `invalid-bill` (`1002`) | A bill value was rejected, for example `Scheduled` status without a `scheduleDate` | Tell the user which field is wrong and why, get a valid value, then retry |
+| `forbidden` (`1003`) | The data belongs to another account | Stop and tell the user; do not retry |
+| `confirm-required` (`1004`) | A destructive call was sent without `confirm` | Ask the user; retry with `confirm` only after an explicit yes |
+| `rate-limited` (`1005`) | Too many requests in a short time | Wait about a minute before trying again; do not loop |
+| `upstream-firestore` (`1006`) | Bill Tracker's database had a temporary problem | Wait a moment and retry once; if it fails again, tell the user |
+| `insufficient-scope` (`1007`) | The user has not granted a permission this tool needs | Name the permission and ask the user to approve it; for `account:delete`, on the Connected AI agents page |
+
+Some failures are not tool results:
+
+- A JSON-RPC error `-32602` about the tool itself means the server has no tool
+  by that name. Check the tool list for a misspelling or a renamed tool.
+- A JSON-RPC error `-32603` is an internal server error. Tell the user, quote
+  the short reference in its message, and do not retry in a loop.
+- A JSON-RPC error `-32022` (unsupported protocol version), or an HTTP 401 or
+  403 from sign-in, is a connection problem that retrying will not fix. Ask
+  the user to update their client or sign in to the `bills` server again.
 
 ## Tool reference
 
