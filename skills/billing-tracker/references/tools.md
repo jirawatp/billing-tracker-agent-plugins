@@ -4,6 +4,11 @@ The `bills` server exposes 30 tools, 3 resources and 1 prompt. Tool names are
 exact. The main inputs listed here help you plan calls; the input schema the
 server advertises is authoritative, so read it before calling a tool.
 
+Tools only change in backward-compatible ways: new tools and new optional
+inputs can appear, and a renamed tool keeps its old name working for a
+deprecation window, marked with a deprecation notice that names the
+replacement.
+
 Kinds: **read** never changes data, **change** edits data, **destructive**
 deletes data or disconnects something and always needs the user's explicit
 confirmation. Permission is the OAuth scope (or personal access token scope)
@@ -38,7 +43,7 @@ the tool needs.
 | Tool | What it does | Kind | Permission | Main inputs |
 | --- | --- | --- | --- | --- |
 | `bills.delete` | Delete one bill | destructive | `bills:delete` | `id`, `confirm: true` |
-| `bills.bulkDelete` | Delete up to 500 bills; preview first with a dry run | destructive | `bills:delete` | `ids`, `confirm: true` (also required with `dryRun`), optional `dryRun` |
+| `bills.bulkDelete` | Delete up to 500 bills; a dry run previews without deleting | destructive (a dry run is read-only) | `bills:delete` | `ids`; `dryRun: true` to preview, with no `confirm`; `confirm: true` to delete |
 
 ## Summaries and reports
 
@@ -56,8 +61,14 @@ the tool needs.
 | Tool | What it does | Kind | Permission | Main inputs |
 | --- | --- | --- | --- | --- |
 | `account.export` | Export all of the user's data | read | `account:read` | none |
-| `account.delete` | Permanently erase the user's bills, LINE link and account | destructive | `account:delete` | the confirmation value its schema requires |
+| `account.delete` | Permanently erase the user's bills, LINE link and account | destructive | `account:delete`, granted only by re-consent (see below) | the confirmation value its schema requires |
 | `account.revokeSessions` | Sign the user out of Bill Tracker on every device (AI agent connections are revoked separately in Settings) | destructive | `account:manage` | none |
+
+`account:delete` is never part of a normal sign-in. The server refuses
+`account.delete` with `insufficient_scope` until the user approves account
+deletion on its dedicated consent screen at
+https://bills.jirawat.dev/settings/connected-agents. That approval is
+short-lived and is not renewed by a refresh token.
 
 ## LINE
 

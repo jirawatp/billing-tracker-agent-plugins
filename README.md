@@ -28,6 +28,7 @@ https://bills.jirawat.dev/mcp
 - [Install](#install)
 - [Headless agents: personal access tokens](#headless-agents-personal-access-tokens)
 - [What your agent can do](#what-your-agent-can-do)
+- [Tool changes and deprecations](#tool-changes-and-deprecations)
 - [Troubleshooting](#troubleshooting)
 - [Repository layout](#repository-layout)
 - [Maintaining this repository](#maintaining-this-repository)
@@ -58,8 +59,11 @@ Every configuration names the server `bills`.
   that; clients that can only start local (stdio) servers can use the
   [mcp-remote bridge](#other-clients-stdio-only).
 - **A current client.** The server implements MCP protocol revision
-  `2026-07-28` and also accepts `2025-06-18` for older clients. The legacy
-  HTTP+SSE transport is not supported.
+  `2026-07-28` and also accepts `2025-11-25` and `2025-06-18`, either through
+  per-request protocol headers or the classic `initialize` handshake. It uses
+  Streamable HTTP only; the legacy HTTP+SSE transport is not supported. Clients
+  limited to `2025-03-26` or older can connect through
+  [mcp-remote](#other-clients-stdio-only) with `--protocol auto`.
 
 ## Sign-in, permissions and privacy
 
@@ -74,10 +78,18 @@ Every configuration names the server `bills`.
   signed in. An agent connected to your account cannot reach anyone else's
   bills.
 - **Permissions are granted step by step.** By default the first sign-in asks
-  for `bills:read` and `bills:write` (some clients, such as Codex, ask for every
-  permission up front). When the agent first uses a tool that needs more, the
-  server asks for that permission and your client either reopens the consent
-  screen or asks you to sign in to the server again.
+  for `bills:read` and `bills:write`; some clients, such as Codex, ask for
+  every advertised permission up front. Clients that want to stay signed in
+  also ask for `offline_access`, which lets them renew the session without
+  another browser sign-in. When the agent first uses a tool that needs more,
+  the server asks for that permission and your client either reopens the
+  consent screen or asks you to sign in to the server again.
+- **Deleting your account always takes a separate approval.** No client can
+  request the `account:delete` permission during sign-in. If you ask an agent
+  to delete your account, its first attempt is refused; you then open
+  [Settings > Connected AI agents](https://bills.jirawat.dev/settings/connected-agents)
+  and approve the deletion on its own consent screen. That approval is
+  short-lived and is never renewed automatically.
 - **You can disconnect any agent.** Open
   [Settings > Connected AI agents](https://bills.jirawat.dev/settings/connected-agents)
   in Bill Tracker to see every connected agent and personal access token, and
@@ -98,10 +110,11 @@ Every configuration names the server `bills`.
 | `reports:read` | Read spending reports |
 | `account:read` | Export all of your data |
 | `account:manage` | Sign you out on every device, turn LINE reminders on or off, unlink LINE |
-| `account:delete` | Delete your Bill Tracker account |
+| `account:delete` | Delete your Bill Tracker account. Never requested at sign-in; approved separately on the Connected AI agents page, for a short time |
 | `line:read` | See whether LINE is linked and reminders are on |
 | `chat:read` | Parse LINE chatbot commands without running them |
 | `chat:write` | Run LINE chatbot commands that change data |
+| `offline_access` | Stay signed in: renew the session without another browser sign-in |
 
 ## Choose your client
 
@@ -245,8 +258,9 @@ url = "https://bills.jirawat.dev/mcp"
 Sign in with `codex mcp login bills` (add `--no-browser` on a remote machine),
 or select Authenticate next to the server in the MCP servers settings of the
 desktop app or IDE extension. Codex requests every permission the server
-offers; to grant only the basics, run
-`codex mcp login bills --scopes bills:read,bills:write`.
+advertises (account deletion is never one of them). To grant only the basics
+while staying signed in, run
+`codex mcp login bills --scopes bills:read,bills:write,offline_access`.
 
 ### Cursor
 
@@ -457,7 +471,9 @@ configure the server in those agents directly.
 
 For clients that can only start local MCP servers, run
 [mcp-remote](https://github.com/punkpeye/mcp-remote) as a bridge. It needs
-Node.js, opens the browser for sign-in and keeps tokens in `~/.mcp-auth`.
+Node.js, opens the browser for sign-in and keeps tokens in `~/.mcp-auth`. With
+`--protocol auto` it speaks the server's current protocol revision on behalf
+of your client, so it also works for clients limited to older MCP versions.
 
 ```json
 {
@@ -469,7 +485,9 @@ Node.js, opens the browser for sign-in and keeps tokens in `~/.mcp-auth`.
         "mcp-remote@latest",
         "https://bills.jirawat.dev/mcp",
         "--transport",
-        "http-only"
+        "http-only",
+        "--protocol",
+        "auto"
       ]
     }
   }
@@ -640,6 +658,8 @@ pass it with `--header-file`:
         "https://bills.jirawat.dev/mcp",
         "--transport",
         "http-only",
+        "--protocol",
+        "auto",
         "--header-file",
         "/path/to/bill-tracker-headers.txt"
       ]
@@ -652,8 +672,10 @@ pass it with `--header-file`:
 
 The server offers 30 tools, 3 resources and 1 prompt. Each tool needs one of
 the permissions listed above. Deleting bills, unlinking LINE and deleting your
-account only run with an explicit confirmation in the request, and the skill
-also asks you before it signs you out everywhere.
+account only run with an explicit confirmation in the request (a bulk-delete
+dry run, which deletes nothing, does not need one), deleting your account also
+needs the separate approval described above, and the skill asks you before it
+signs you out everywhere.
 
 ### Bills
 
@@ -674,7 +696,7 @@ also asks you before it signs you out everywhere.
 | `bills.schedule` | Mark a bill scheduled for payment on a date | `bills:write` |
 | `bills.toggleTopPriority` | Pin or unpin a bill as top priority | `bills:write` |
 | `bills.delete` | Delete a bill (destructive) | `bills:delete` |
-| `bills.bulkDelete` | Delete up to 500 bills; can preview with a dry run (destructive) | `bills:delete` |
+| `bills.bulkDelete` | Delete up to 500 bills; a dry run previews without deleting (destructive) | `bills:delete` |
 
 ### Summaries and reports
 
@@ -692,7 +714,7 @@ also asks you before it signs you out everywhere.
 | Tool | What it does | Permission |
 | --- | --- | --- |
 | `account.export` | Export all of your data | `account:read` |
-| `account.delete` | Delete your account and all of its data (destructive) | `account:delete` |
+| `account.delete` | Delete your account and all of its data (destructive; needs the separate approval) | `account:delete` |
 | `account.revokeSessions` | Sign you out of Bill Tracker on every device (destructive) | `account:manage` |
 | `lineLink.status` | Whether LINE is linked and daily reminders are on | `line:read` |
 | `lineLink.setNotifyEnabled` | Turn daily LINE reminders on or off | `account:manage` |
@@ -708,6 +730,22 @@ also asks you before it signs you out everywhere.
 | `summary://today` | Today's summary |
 | `report://spend/<yyyy-mm>` | The spending report for the period ending with that month |
 | `summarize-month` prompt | Summarizes one month's spending; takes `month` as `YYYY-MM` |
+
+## Tool changes and deprecations
+
+The server treats its tools as a versioned public contract, because some hosts,
+ChatGPT among them, keep calling the tool list they saw when you added the
+plugin until an admin refreshes it.
+
+- New tools, new optional inputs and new optional output fields can appear at
+  any time. Existing setups keep working.
+- A tool is never renamed, removed or made stricter in place. The server adds
+  the new tool next to the old one, marks the old one with a deprecation
+  notice, and removes it only after the deprecation has been announced here for
+  the whole deprecation window.
+
+Current deprecations: none. Any future deprecation is listed here with the
+deprecated tool, its replacement and the date it will be removed.
 
 ## Troubleshooting
 
@@ -729,7 +767,13 @@ environment variable is set where the client starts.
 The agent needs a permission you have not granted yet. Approve it when your
 client asks, or sign in to the server again; in Claude Code, open `/mcp` and
 authenticate the server again. For a personal access token, create a new token
-that includes the permission.
+that includes the permission. If the missing permission is `account:delete`,
+approve it on the Connected AI agents page instead; clients cannot request it
+during sign-in.
+
+**You have to sign in again about every hour.** Your client did not ask for
+`offline_access`, so it cannot renew the session. Sign in to the server again;
+with Codex, include `offline_access` in `--scopes`.
 
 **Claude Code reports a server with a "url" but no "type".** Add
 `"type": "http"` to the server entry.
@@ -741,15 +785,16 @@ that includes the permission.
 expected. The endpoint accepts only MCP requests sent with POST.
 
 **The client reports an unsupported protocol version or cannot initialize.**
-The server supports MCP `2026-07-28` and `2025-06-18`. Update your client. When
-you use mcp-remote, adding `--protocol auto` to its arguments lets it talk to
-the server in the current protocol revision on behalf of an older client.
+The server supports MCP `2026-07-28`, `2025-11-25` and `2025-06-18`. Update
+your client. Clients limited to `2025-03-26` or older can connect through
+[mcp-remote](#other-clients-stdio-only) with `--protocol auto`.
 
 **Tools are missing or out of date.** The server does not push tool-list
 changes, so restart the client or refresh the server: **MCP: Reset Cached
 Tools** in VS Code or the refresh button in Windsurf. ChatGPT keeps a snapshot
-of the tools from when the plugin was created; a workspace admin refreshes it
-from the plugin's settings.
+of the tools from when the plugin was created. Existing tools keep working (see
+[Tool changes and deprecations](#tool-changes-and-deprecations)); a workspace
+admin refreshes the snapshot from the plugin's settings to pick up new ones.
 
 **Every tool appears twice.** You installed the plugin and also added the
 server by hand. Remove one of them.
@@ -881,11 +926,15 @@ pick up changes when the version changes.
 
 The tool names, resources and prompt in `skills/billing-tracker` follow the
 server's integration contract, which is also listed in `scripts/validate.mjs`.
-If the server adds, renames or removes a tool, update that list,
-`references/tools.md`, `SKILL.md` and the tool tables in this README. The
-validator checks that the reference table and this README cover every contract
-tool, and that no document names a tool, resource or prompt outside the
-contract.
+When the server adds a tool, add it to that list, to `references/tools.md`, to
+`SKILL.md` where it matters, and to the tool tables in this README. When the
+server deprecates a tool, keep the old one listed, add its replacement, and
+record the deprecation under
+[Tool changes and deprecations](#tool-changes-and-deprecations) for the whole
+deprecation window; the server only removes the old tool after that, and then
+it comes out of every list here too. The validator checks that the reference
+table and this README cover every contract tool, and that no document names a
+tool, resource or prompt outside the contract.
 
 ## License
 

@@ -28,7 +28,11 @@ Thai Baht (THB) and dates follow the Asia/Bangkok calendar.
   to approve it. Many clients reopen the Bill Tracker consent screen; others
   need the user to sign in to the server again. A personal access token
   needs to be replaced by one that includes that permission, created at
-  https://bills.jirawat.dev/settings/connected-agents.
+  https://bills.jirawat.dev/settings/connected-agents. The `account:delete`
+  permission works differently; see `account.delete` below.
+- The server can add tools over time; follow each tool's own description and
+  input schema. If a tool carries a deprecation notice, use the replacement
+  it names.
 
 ## Ground rules
 
@@ -75,7 +79,8 @@ Read-only tools never need confirmation: `bills.list`, `bills.get`,
 `bills.query`, `bills.search`, `bills.recentlyChanged`, `bills.byRef`,
 `summary.kpis`, `summary.month`, `summary.chatbot`, `reports.spend`,
 `reports.spendDigest`, `reports.paidMonthlyAverage`, `account.export`,
-`lineLink.status` and `chat.parseCommand`.
+`lineLink.status` and `chat.parseCommand`. A `bills.bulkDelete` call with
+`dryRun: true` is also read-only: it only reports what would be deleted.
 
 Tools that change data: say what you are about to do (which bill, which
 fields, which values) and wait for a yes, unless the user's message already
@@ -88,11 +93,10 @@ Destructive tools: always confirm immediately before the call, even when the
 user asked directly, and list exactly what will be affected.
 
 - `bills.delete` deletes one bill.
-- `bills.bulkDelete` deletes up to 500 bills, and its schema requires
-  `confirm: true` on every call, including a dry run. Once the user agrees to
-  look at deleting a set of bills, call it with `dryRun: true` and
-  `confirm: true` to preview, show exactly what would be deleted, and delete
-  (the same call without `dryRun`) only after a second, explicit yes.
+- `bills.bulkDelete` deletes up to 500 bills. Preview first with
+  `dryRun: true`, which deletes nothing and needs no `confirm`. Show the user
+  exactly which bills would be deleted, and only after their explicit yes call
+  it again with the same `ids` and `confirm: true`.
 - `lineLink.unlink` disconnects the user's LINE account. Bills stay, but LINE
   reminders and the LINE chatbot stop working for this account until the user
   links LINE again in the app.
@@ -103,8 +107,14 @@ user asked directly, and list exactly what will be affected.
   account. Use it only when the user explicitly asks to delete their whole
   Bill Tracker account. Explain that it cannot be undone, offer
   `account.export` first, and ask them to confirm in their own words. Then
-  pass the confirmation value that the tool's input schema requires. Never use
-  it to clean up data.
+  pass the confirmation value that the tool's input schema requires. The
+  `account:delete` permission is never part of a normal sign-in, so unless the
+  user has just approved it, the call fails with `insufficient_scope`. Tell
+  the user to open https://bills.jirawat.dev/settings/connected-agents and
+  approve account deletion on its dedicated consent screen, then call again
+  once they say it is done; the approval is short-lived. Never try to obtain
+  `account:delete` through a normal sign-in, and never use this tool to clean
+  up data.
 
 Set `confirm` only after the user agreed to that specific action in this
 conversation. If the server answers that confirmation is required, ask the
@@ -182,7 +192,7 @@ even when they typed the command themselves.
 | Invalid bill | The server rejected a value. Tell the user which field and why, and ask for a corrected value. |
 | Confirmation required | You called a destructive tool without `confirm`. Ask the user before calling again. |
 | Rate limited | Wait a minute, then try again. Avoid loops of repeated calls. |
-| Insufficient scope | The user has not granted that permission. Name it and ask them to approve it. |
+| Insufficient scope | The user has not granted that permission. Name it and ask them to approve it; for `account:delete`, on the Connected AI agents page. |
 | Not signed in | Ask the user to sign in to the `bills` server again. |
 
 ## Tool reference
