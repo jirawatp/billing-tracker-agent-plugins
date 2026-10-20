@@ -1,76 +1,78 @@
-# Handover
+# Maintainer handover
 
-This branch holds the full history of the public repository
-`jirawatp/billing-tracker-agent-plugins`: the plugins, connector settings and
-agent skill for the Bill Tracker MCP server at `https://bills.jirawat.dev/mcp`.
-It was built and validated locally and has not been pushed to the public
-repository yet. See the [README](README.md) for what is in it and how it is
-maintained.
+This repository contains the plugins, connector settings and agent skill for
+the Bill Tracker MCP server at `https://bills.jirawat.dev/mcp`. The plugin name
+is `billing-tracker`, its MCP server key is `bills`, and its first release is
+version `0.1.0`. See the [README](README.md) for installation and maintenance.
 
-## Publish
+## Deployment checkpoint
 
-Once the public repository exists and is still empty, push this branch to its
-`main` from a clone of the private source repository that holds this branch:
+The application was deployed from commit `384a4bd` on 20 October 2026 at
+07:15 Asia/Bangkok (00:15 UTC). The deployment smoke check passed:
+
+- public protected-resource metadata identified the MCP resource;
+- an unauthenticated MCP request returned HTTP 401 with an OAuth sign-in
+  challenge.
+
+These checks establish that the public endpoints are reachable. Authenticated
+tool calls and complete client sign-in flows still need live testing.
+
+The configurations and documentation cover the server's 30 tools, 3 resources
+and 1 prompt, its error codes, confirmation and dry-run rules, default scopes
+including `offline_access`, separate approval for `account:delete`, and the
+500-bill cap on `bills.list`.
+
+The documentation now reflects these details of the deployed contract:
+
+- `initialize` offers of an unsupported revision receive `2025-11-25`, and
+  the client decides whether it can continue. An unsupported protocol header
+  still gets `-32022`.
+- Every `chat.run` command needs `chat:write`; deletion additionally needs
+  `bills:delete`.
+- The mcp-remote examples omit `--protocol auto`. The server advertises
+  `2025-11-25` and `2025-06-18` through `server/discover`; use its ordinary
+  handshake bridge with the documented configuration.
+
+## Publish this repository
+
+Before the first push, confirm that `origin` is the intended public repository,
+review the full tree and history for private data, and run:
 
 ```bash
-git clone --single-branch --branch cursor/agent-plugins-export-4fa1 <private source repository URL> agent-plugins
-cd agent-plugins
-git push https://github.com/jirawatp/billing-tracker-agent-plugins cursor/agent-plugins-export-4fa1:main
+node scripts/sync.mjs --check
+node scripts/validate.mjs --ci
+git diff --check
 ```
 
-That also publishes this file, which holds no secrets. To leave it out, push
-`cursor/agent-plugins-export-4fa1~1:main` instead, or delete it afterwards. If
-the public repository is no longer empty, rebase this branch onto its `main`
-(keep this branch's `README.md`) before pushing.
+Publish the reviewed `main` branch with:
 
-## Contract
+```bash
+git push -u origin main
+```
 
-The server address and integration contract match PR #49 in the private source
-repository ("MCP server (combined)", open and unmerged on 2026-10-19). Checked
-against that PR's tool-schema snapshot and code:
-- the server URL;
-- all 30 tool names;
-- the error codes and kinds;
-- the confirm and dry-run rules;
-- the 3 resources and the prompt;
-- the default scope hint (with `offline_access`) and the separate approval for
-  `account:delete`;
-- the 500-bill cap on `bills.list`.
+If the public repository already has commits, reconcile its history first.
+Keep the existing `billing-tracker` plugin and marketplace identities. Do not
+create a second plugin or force-push over another history.
 
-Three wording differences to fix before publishing:
+The first public CI run also checks the published schema formats, client
+validators and links. The README CI badge and repository links need that first
+push before they can resolve.
 
-- **Protocol negotiation.** In PR #49, `initialize` never fails on version: it
-  answers `2025-11-25` and the client decides. `-32022` only comes back for
-  other requests with an unsupported `MCP-Protocol-Version` header. The
-  README's "Before you start" and its `-32022` troubleshooting entry say a
-  first offer of `2026-07-28` gets `-32022`, and that `2025-03-26` clients
-  cannot connect. That should become "may not connect".
-- **`chat.run` permission.** In PR #49, `chat.run` needs `chat:write` for
-  every command, and deleting through it also needs `bills:delete`. The
-  README permission table and `references/tools.md` say `chat:write` is only
-  for commands that change data.
-- **mcp-remote `--protocol auto`.** The server plan recommends it for old
-  clients. PR #49 answers `server/discover` listing only `2025-11-25` and
-  `2025-06-18`, and mcp-remote 0.15.1 in that mode then refuses to bridge.
-  This repository deliberately does not use the flag; the plan text should
-  drop it.
+## Remaining release checks
 
-## Still placeholder or untested
-
-- **Live server.** Nothing here has been tested against a running server. On
-  2026-10-19 the server URL still served the web app, so the server was not
-  deployed yet. The plugin was only installed locally with Claude Code, Gemini
-  CLI, Codex, Copilot CLI and Antigravity CLI, and each loaded the server and
-  the skill. Cursor, VS Code, the Claude apps, ChatGPT, Windsurf, Cline and
-  Zed were not exercised.
-- **CI badge.** The README's CI badge and Actions link return 404 until the
-  first push to the public repository. The first CI run checks them again.
-- **Pre-launch note.** Remove the README's "has not launched yet" note once
-  the server is live and tested.
-- **MCP Registry.** Publish with the manual workflow after launch; it refuses
-  to run until the server answers with an OAuth challenge. First decide the
-  name: `io.github.jirawatp/billing-tracker`, or `dev.jirawat/billing-tracker`
-  with DNS verification.
-- **Directory listings.** Nothing has been submitted to the Claude, OpenAI,
-  Cursor or Cline directories, and the manifests carry no privacy policy or
-  terms URLs.
+- **Live clients.** Before deployment, local installs in Claude Code, Gemini
+  CLI, Codex, Copilot CLI and Antigravity CLI loaded the server and skill.
+  This was configuration validation, not authenticated live compatibility.
+  Cursor, VS Code, Claude apps, ChatGPT, Windsurf, Cline and Zed were not
+  exercised. Record each live client result separately.
+- **MCP Registry.** The existing `server.json` uses
+  `io.github.jirawatp/billing-tracker`; retain that identity. After the first
+  public CI passes and live sign-in works, run **Publish to MCP Registry**
+  from `main` in Actions. The workflow checks for the OAuth challenge, signs
+  in using GitHub OIDC and publishes `server.json`. A registry version cannot
+  be published twice: bump `config.json` and run `node scripts/sync.mjs`
+  before publishing a later release.
+- **Directory listings.** Claude, OpenAI, Cursor and Cline directory
+  submissions remain separate work. The manifests do not include privacy
+  policy or terms URLs; complete any directory's required fields before
+  submitting there.

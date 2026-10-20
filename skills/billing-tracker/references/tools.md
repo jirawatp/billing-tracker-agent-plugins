@@ -83,7 +83,7 @@ short-lived and is not renewed by a refresh token.
 | Tool | What it does | Kind | Permission | Main inputs |
 | --- | --- | --- | --- | --- |
 | `chat.parseCommand` | Parse one line of the Thai or English chatbot syntax without running it | read | `chat:read` | `text` |
-| `chat.run` | Run one chatbot command; commands that add, pay, change an amount or delete need `confirm: true` | change, or destructive for delete | `chat:write` for commands that change data | `text`, optional `confirm` |
+| `chat.run` | Run one chatbot command; commands that add, pay, change an amount or delete need `confirm: true` | read, change, or destructive for delete | `chat:write` for every command; deletion also needs `bills:delete` | `text`, optional `confirm` |
 
 ## Errors
 

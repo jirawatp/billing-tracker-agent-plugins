@@ -15,9 +15,9 @@ https://bills.jirawat.dev/mcp
 ```
 
 > [!NOTE]
-> The Bill Tracker MCP server has not launched yet. Everything here follows the
-> server's published integration contract and each client's documented setup
-> format, but none of it has been tested against the live server.
+> The Bill Tracker MCP server was deployed on 20 October 2026. Public metadata
+> and the OAuth sign-in challenge have passed the deployment smoke check.
+> Authenticated tool calls and the client setups below still need live testing.
 
 ## Contents
 
@@ -60,10 +60,11 @@ Every configuration names the server `bills`.
   [mcp-remote bridge](#other-clients-stdio-only).
 - **A current client.** The server speaks MCP protocol revisions `2025-11-25`
   (preferred) and `2025-06-18` through the standard `initialize` handshake that
-  current clients use. Revision `2026-07-28` is not supported yet: a client
-  that offers it first gets error `-32022` and falls back to `2025-11-25` on its
-  own. The server uses Streamable HTTP only, without the legacy HTTP+SSE
-  transport, and clients limited to `2025-03-26` or older cannot connect.
+  current clients use. If a client offers another revision in `initialize`,
+  the server answers with `2025-11-25`; the client decides whether it can
+  continue. Other requests with an unsupported `MCP-Protocol-Version` header
+  get error `-32022`. The server uses Streamable HTTP only, without the legacy
+  HTTP+SSE transport, so clients limited to `2025-03-26` or older may not connect.
 
 ## Sign-in, permissions and privacy
 
@@ -113,7 +114,7 @@ Every configuration names the server `bills`.
 | `account:delete` | Delete your Bill Tracker account. Never requested at sign-in; approved separately on the Connected AI agents page, for a short time |
 | `line:read` | See whether LINE is linked and reminders are on |
 | `chat:read` | Parse LINE chatbot commands without running them |
-| `chat:write` | Run LINE chatbot commands that change data |
+| `chat:write` | Run any LINE chatbot command, including commands that only read data; deleting also needs `bills:delete` |
 | `offline_access` | Stay signed in: renew the session without another browser sign-in |
 
 ## Choose your client
@@ -716,7 +717,7 @@ signs you out everywhere.
 | `lineLink.setNotifyEnabled` | Turn daily LINE reminders on or off | `account:manage` |
 | `lineLink.unlink` | Unlink your LINE account; bills stay (destructive) | `account:manage` |
 | `chat.parseCommand` | Parse a Thai or English LINE chatbot command without running it | `chat:read` |
-| `chat.run` | Run a LINE chatbot command; commands that change data need confirmation | `chat:write` |
+| `chat.run` | Run a LINE chatbot command; commands that change data need confirmation | `chat:write` for every command; deletion also needs `bills:delete` |
 
 ### Resources and prompt
 
@@ -822,11 +823,12 @@ with Codex, include `offline_access` in `--scopes`.
 expected. The endpoint accepts only MCP requests sent with POST.
 
 **The client reports an unsupported protocol version (`-32022`) or cannot
-initialize.** The server supports MCP `2025-11-25` and `2025-06-18`. A client
-that tries `2026-07-28` first should fall back to `2025-11-25` by itself; if
-yours stops instead, update it. Clients limited to `2025-03-26` or older cannot
-connect yet, and mcp-remote does not change that because it passes the
-client's own handshake through.
+initialize.** The server supports MCP `2025-11-25` and `2025-06-18`. An
+`initialize` offer of another revision is answered with `2025-11-25`; the
+client decides whether it can continue. Error `-32022` means a request used an
+unsupported `MCP-Protocol-Version` header. Update your client if it cannot use
+a supported revision. Clients limited to `2025-03-26` or older may not connect;
+mcp-remote passes the client's own handshake through.
 
 **The agent reports error `-32603` with a short reference.** That is an
 internal server error, not a problem with your setup. Try again later; if it
