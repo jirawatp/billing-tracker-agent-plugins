@@ -17,7 +17,9 @@ https://bills.jirawat.dev/mcp
 > [!NOTE]
 > The Bill Tracker MCP server was deployed on 20 October 2026. Public metadata
 > and the OAuth sign-in challenge have passed the deployment smoke check.
-> Authenticated tool calls and the client setups below still need live testing.
+> Google sign-in and 21 live OAuth/MCP checks passed with the official JavaScript
+> SDK, including bill writes, refresh and revocation. The individual client
+> setups below still need their own live compatibility checks.
 
 ## Contents
 

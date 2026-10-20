@@ -14,8 +14,13 @@ The application was deployed from commit `384a4bd` on 20 October 2026 at
 - an unauthenticated MCP request returned HTTP 401 with an OAuth sign-in
   challenge.
 
-These checks establish that the public endpoints are reachable. Authenticated
-tool calls and complete client sign-in flows still need live testing.
+Google sign-in and a subsequent live OAuth authorization passed with the
+official MCP JavaScript SDK on 20 October 2026. All 21 checks passed: discovery,
+PKCE code exchange, tool/resource/prompt discovery, a bounded bill read,
+synthetic zero-baht bill create/read/update, deletion confirmation, refresh
+rotation and reconnect, revocation, and rejection of the revoked token. The
+synthetic bill was deleted and the grant revoked. LINE sign-in and individual
+product clients still need separate live checks.
 
 The configurations and documentation cover the server's 30 tools, 3 resources
 and 1 prompt, its error codes, confirmation and dry-run rules, default scopes
@@ -65,11 +70,12 @@ push before they can resolve.
   This was configuration validation, not authenticated live compatibility.
   Cursor, VS Code, Claude apps, ChatGPT, Windsurf, Cline and Zed were not
   exercised. Record each live client result separately.
-- **MCP Registry.** The existing `server.json` uses
-  `io.github.jirawatp/billing-tracker`; retain that identity. After the first
-  public CI passes and live sign-in works, run **Publish to MCP Registry**
-  from `main` in Actions. The workflow checks for the OAuth challenge, signs
-  in using GitHub OIDC and publishes `server.json`. A registry version cannot
+- **MCP Registry.** Version `0.1.0` of the existing
+  `io.github.jirawatp/billing-tracker` identity was published successfully on
+  20 October 2026 after public CI passed. Retain that identity. For a later
+  release, run **Publish to MCP Registry** from `main` in Actions. The workflow
+  checks for the OAuth challenge, signs in using GitHub OIDC and publishes
+  `server.json`. A registry version cannot
   be published twice: bump `config.json` and run `node scripts/sync.mjs`
   before publishing a later release.
 - **Directory listings.** Claude, OpenAI, Cursor and Cline directory
