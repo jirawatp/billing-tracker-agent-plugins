@@ -14,6 +14,14 @@ deletes data or disconnects something and always needs the user's explicit
 confirmation. Permission is the OAuth scope (or personal access token scope)
 the tool needs.
 
+Bill date write inputs use exact `YYYY-MM-DD`. Years 2400 to 2699 inclusive
+are Buddhist Era and become Gregorian by subtracting 543 before calendar
+validation. For example, `2567-02-29` becomes `2024-02-29`; `2566-02-29` is
+rejected after conversion. This affects `dueDate`, `paidDate`, `scheduleDate`
+and `nextStatementDate` on writes only. Query/report dates, timestamps and
+existing history are unchanged. Updates preserve a legacy date sent exactly
+as stored; a different supplied date is normalized and checked.
+
 ## Bills: read
 
 | Tool | What it does | Kind | Permission | Main inputs |
@@ -68,7 +76,9 @@ the tool needs.
 `account.delete` with `insufficient_scope` until the user approves account
 deletion on its dedicated consent screen at
 https://bills.jirawat.dev/settings/connected-agents. That approval is
-short-lived and is not renewed by a refresh token.
+bounded by the original recent sign-in: it expires at that sign-in time plus
+five minutes. Consent and code exchange do not extend the deadline, and no
+refresh token is issued.
 
 ## LINE
 
@@ -83,7 +93,14 @@ short-lived and is not renewed by a refresh token.
 | Tool | What it does | Kind | Permission | Main inputs |
 | --- | --- | --- | --- | --- |
 | `chat.parseCommand` | Parse one line of the Thai or English chatbot syntax without running it | read | `chat:read` | `text` |
-| `chat.run` | Run one chatbot command; commands that add, pay, change an amount or delete need `confirm: true` | read, change, or destructive for delete | `chat:write` for every command; deletion also needs `bills:delete` | `text`, optional `confirm` |
+| `chat.run` | Run one chatbot command; commands that add, pay, change an amount or delete need `confirm: true` | read, change, or destructive for delete | `bills:read` or `chat:write` for read commands; `chat:write` for changes; deletion also needs `bills:delete` | `text`, optional `confirm` |
+
+The read whitelist is `help`, `list`, `due`, `overdue`, `unconfirmed` and
+`summary`, including supported Thai aliases. A `chat:write` token can still
+run them without `bills:read`. The parser-only `chat:read` scope grants no
+bill access. All other commands require `chat:write`; mutation scope checks
+run before bill lookup or writes. The tool's destructive annotation remains
+unchanged, so a host may still ask before a read command.
 
 ## Errors
 

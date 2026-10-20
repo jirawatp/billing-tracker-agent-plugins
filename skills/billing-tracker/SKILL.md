@@ -51,6 +51,15 @@ Thai Baht (THB) and dates follow the Asia/Bangkok calendar.
 ## Dates
 
 - Dates are calendar dates written `YYYY-MM-DD`. Bills have no times.
+- On bill writes, exact date inputs with years 2400 to 2699 inclusive are
+  interpreted as Buddhist Era. The server subtracts 543 before Gregorian
+  calendar validation: `2569-10-20` becomes `2026-10-20`, and `2567-02-29`
+  becomes `2024-02-29`. State that interpreted date before saving; an
+  impossible converted date is rejected. Other years are unchanged.
+- This applies only to `dueDate`, `paidDate`, `scheduleDate` and
+  `nextStatementDate` on bill writes. Use Gregorian dates for queries and
+  reports. Do not convert timestamps or existing history; a legacy field
+  sent exactly as stored is preserved on an unrelated edit.
 - "Today" means today in Asia/Bangkok (UTC+7, no daylight saving time). The
   server uses that date when you leave `today` out, so omit `today` unless
   the user asks about another reference date, such as "what was overdue on
@@ -115,7 +124,10 @@ user asked directly, and list exactly what will be affected.
   user has just approved it, the call fails for a missing permission. Tell
   the user to open https://bills.jirawat.dev/settings/connected-agents and
   approve account deletion on its dedicated consent screen, then call again
-  once they say it is done; the approval is short-lived. Never try to obtain
+  once they say it is done. The permission expires at that original sign-in
+  time plus five minutes; consent and code exchange do not extend it, and
+  no refresh token is issued. If it expires, ask for a fresh sign-in and
+  dedicated approval. Never try to obtain
   `account:delete` through a normal sign-in, and never use this tool to clean
   up data.
 
@@ -129,6 +141,12 @@ show what a chatbot command would do without running it. A `chat.run` command
 that adds a bill, records a payment, changes an amount or deletes needs
 `confirm: true`, and such a call always needs the user's explicit yes first,
 even when they typed the command themselves.
+
+The read commands `help`, `list`, `due`, `overdue`, `unconfirmed` and `summary`
+accept `bills:read` or `chat:write`. Existing `chat:write` tokens need no
+additional read scope. Commands that change data require `chat:write`, and
+deletion also requires `bills:delete`. The `chat:read` permission only permits
+`chat.parseCommand`; it never grants access to the user's bills.
 
 ## Finding the right bill
 

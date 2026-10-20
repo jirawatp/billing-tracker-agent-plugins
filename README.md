@@ -18,8 +18,9 @@ https://bills.jirawat.dev/mcp
 > The Bill Tracker MCP server was deployed on 20 October 2026. Public metadata
 > and the OAuth sign-in challenge have passed the deployment smoke check.
 > Google sign-in and 21 live OAuth/MCP checks passed with the official JavaScript
-> SDK, including bill writes, refresh and revocation. The individual client
-> setups below still need their own live compatibility checks.
+> SDK, including bill writes, refresh and revocation. The user also verified
+> LINE QR sign-in in the browser and reached the bill ledger. The individual
+> client setups below still need their own live compatibility checks.
 
 ## Contents
 
@@ -91,8 +92,9 @@ Every configuration names the server `bills`.
   request the `account:delete` permission during sign-in. If you ask an agent
   to delete your account, its first attempt is refused; you then open
   [Settings > Connected AI agents](https://bills.jirawat.dev/settings/connected-agents)
-  and approve the deletion on its own consent screen. That approval is
-  short-lived and is never renewed automatically.
+  and approve the deletion on its own consent screen after a recent sign-in.
+  The permission expires at that original sign-in time plus five minutes;
+  approval and code exchange do not restart the clock. No refresh token is issued.
 - **You can disconnect any agent.** Open
   [Settings > Connected AI agents](https://bills.jirawat.dev/settings/connected-agents)
   in Bill Tracker to see every connected agent and personal access token, and
@@ -105,17 +107,20 @@ Every configuration names the server `bills`.
   configuration and instructions. Your MCP client stores your sign-in tokens,
   and your bills stay in Bill Tracker.
 
+Read the service's [Privacy Policy](https://bills.jirawat.dev/privacy) and
+[Terms of Service](https://bills.jirawat.dev/terms) before connecting a client.
+
 | Permission | Lets the agent |
 | --- | --- |
-| `bills:read` | List, search and read bills and summaries |
+| `bills:read` | List, search and read bills and summaries, including the read commands of `chat.run` |
 | `bills:write` | Add and edit bills, record payments, confirm amounts, schedule payments |
 | `bills:delete` | Delete bills |
 | `reports:read` | Read spending reports |
 | `account:read` | Export all of your data |
 | `account:manage` | Sign you out on every device, turn LINE reminders on or off, unlink LINE |
-| `account:delete` | Delete your Bill Tracker account. Never requested at sign-in; approved separately on the Connected AI agents page, for a short time |
+| `account:delete` | Delete your Bill Tracker account. Approved separately after a recent sign-in; expires at that sign-in plus five minutes, with no refresh |
 | `line:read` | See whether LINE is linked and reminders are on |
-| `chat:read` | Parse LINE chatbot commands without running them |
+| `chat:read` | Parse LINE chatbot commands without running them or reading bills |
 | `chat:write` | Run any LINE chatbot command, including commands that only read data; deleting also needs `bills:delete` |
 | `offline_access` | Stay signed in: renew the session without another browser sign-in |
 
@@ -676,6 +681,22 @@ dry run, which deletes nothing, does not need one), deleting your account also
 needs the separate approval described above, and the skill asks you before it
 signs you out everywhere.
 
+### Bill dates
+
+Bill writes accept calendar dates in exact `YYYY-MM-DD` form. Years 2400 to
+2699 inclusive are interpreted as Buddhist Era: the server subtracts 543
+before checking the resulting Gregorian date. For example, `2569-10-20`
+stores `2026-10-20`, and `2567-02-29` stores the valid leap day `2024-02-29`.
+`2566-02-29` is rejected because `2023-02-29` does not exist. Years outside
+that range are unchanged, so the range also deliberately covers dates that
+could otherwise look like distant Gregorian years.
+
+The rule applies only to bill date fields (`dueDate`, `paidDate`,
+`scheduleDate`, `nextStatementDate`) when writing through the app, LINE/chat,
+CSV import or MCP. Query and report dates stay Gregorian. Timestamps and
+existing history are not converted; an update that leaves a legacy value
+exactly unchanged preserves it.
+
 ### Bills
 
 | Tool | What it does | Permission |
@@ -719,7 +740,14 @@ signs you out everywhere.
 | `lineLink.setNotifyEnabled` | Turn daily LINE reminders on or off | `account:manage` |
 | `lineLink.unlink` | Unlink your LINE account; bills stay (destructive) | `account:manage` |
 | `chat.parseCommand` | Parse a Thai or English LINE chatbot command without running it | `chat:read` |
-| `chat.run` | Run a LINE chatbot command; commands that change data need confirmation | `chat:write` for every command; deletion also needs `bills:delete` |
+| `chat.run` | Run a LINE chatbot command; commands that change data need confirmation | `bills:read` or `chat:write` for read commands; `chat:write` for changes; deletion also needs `bills:delete` |
+
+The read commands of `chat.run` are `help`, `list`, `due`, `overdue`,
+`unconfirmed` and `summary`, including their supported Thai aliases. Existing
+`chat:write` tokens can run those commands without `bills:read`. The
+`chat:read` permission only parses commands through `chat.parseCommand` and
+grants no financial data access. The tool keeps its destructive annotation,
+so a client may still ask for confirmation before a read command.
 
 ### Resources and prompt
 
